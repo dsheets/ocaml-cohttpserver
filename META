@@ -1,0 +1,5 @@
+description = "Lightweight HTTP daemon"
+version = "0.1"
+requires = "lwt,cohttp"
+archive(byte) = "cohttpserver.cma"
+archive(native) = "cohttpserver.cmxa"
