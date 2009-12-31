@@ -1,0 +1,5 @@
+description = "HTML generation library"
+version = "0.1"
+requires = ""
+archive(byte) = "htmlgen.cma"
+archive(native) = "htmlgen.cmxa"
