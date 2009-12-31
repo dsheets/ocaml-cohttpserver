@@ -8,6 +8,10 @@ generating HTML
 * server/ is a full daemon implementation with MIME and other
 functions for serving web sites
 
+* crunch/ has a utility called "mlcrunch" which converts a directory
+of static files into a standalone ML file which can serve them up
+directly from memory. Useful for grabbing templates.
+
 --
 This library is originally based on the "do it yourself OCaml HTTP"
 daemon by Stefano Zacchiroli <zack@cs.unibo.it>, and since adapted
