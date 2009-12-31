@@ -1,9 +1,9 @@
 .DEFAULT: all
 all:
 	@cd server && $(MAKE)
-	@cd lib && $(MAKE)
+	@cd htmlgen && $(MAKE)
 
 %:
 	@cd server && $(MAKE) $*
-	@cd lib && $(MAKE) $*
+	@cd htmlgen && $(MAKE) $*
 
