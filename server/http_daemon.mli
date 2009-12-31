@@ -32,7 +32,6 @@ val respond_error :
   ?version:Cohttp.Http_types.version ->
   ?status:Cohttp.Http_types.status_code -> Lwt_io.output_channel -> unit Lwt.t
 val respond_not_found :
-  url:'a ->
   ?version:Cohttp.Http_types.version -> Lwt_io.output_channel -> unit Lwt.t
 val respond_forbidden :
   url:'a ->
