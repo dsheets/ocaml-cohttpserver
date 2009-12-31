@@ -1,8 +1,9 @@
-.PHONY: all clean
+.DEFAULT: all
 all:
-	@cd server && $(MAKE) all
-	@cd lib && $(MAKE) all
+	@cd server && $(MAKE)
+	@cd lib && $(MAKE)
 
-clean:
-	@cd server && $(MAKE) clean
-	@cd lib && $(MAKE) clean
+%:
+	@cd server && $(MAKE) $*
+	@cd lib && $(MAKE) $*
+
