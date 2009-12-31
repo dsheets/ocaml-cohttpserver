@@ -1,6 +1,6 @@
 OCAMLMAKEFILE=../OCamlMakefile
 
-SOURCES = http_tcp_server.ml http_daemon.ml mime_types.ml magic_mime.ml
+SOURCES = log.ml http_tcp_server.ml http_daemon.ml mime_types.ml magic_mime.ml
 PACKS = lwt cohttp
 RESULT = cohttpserver
 LIB_PACK_NAME = cohttpserver
