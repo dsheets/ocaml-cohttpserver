@@ -6,7 +6,7 @@ LIB_PACK_NAME = htmlgen
 ANNOTATE = yes
 
 .PHONY: all
-all: pack-byte-code pack-native-code 
+all: pack-byte-code pack-native-code htmlgen.cma htmlgen.cmxa
 	@ :
 
 DISTVERSION = 0.1
