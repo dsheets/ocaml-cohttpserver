@@ -1,28 +1,18 @@
-(*pp camlp4o -I `ocamlfind query lwt.syntax` pa_lwt.cmo *)
-open Lwt
-open Lwt_io
-
-let magic = Hashtbl.create 31
-
-let init file_name =
-  with_file ~flags:[Unix.O_RDONLY] ~mode:input file_name
-    (fun ch ->
-      let split = Pcre.split ~pat:"[ \r\t\n]+" in
-      Lwt_stream.iter
-        (fun l ->
-           if l = "" || l.[0] <> '#' then (
-             match split l with
-             | [mime_type] -> ()
-             | [] -> ()
-             | mime_type :: exts ->
-               let m = String.lowercase mime_type in
-               List.iter
-                 (fun ext -> 
-                    Hashtbl.replace magic ext m
-                 ) exts
-          )
-       ) (read_lines ch)
-   )
+(*
+ * Copyright (c) 2009 Anil Madhavapeddy <anil@recoil.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *)
 
 (* Retrieve file extension , if any, or blank string otherwise *)
 let get_extension ~filename =
@@ -35,7 +25,4 @@ let get_extension ~filename =
 (* Given a full filename, lookup its MIME type *)
 let lookup ~filename =
   let ext = get_extension ~filename in
-  try
-    Hashtbl.find magic (String.lowercase ext)
-  with
-    Not_found -> "application/octet-stream"
+  Mime_types.t (String.lowercase ext)
