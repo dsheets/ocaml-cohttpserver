@@ -18,7 +18,7 @@ depend: META
 META: META.in Makefile
 	cat META.in | sed -e 's/@DISTVERSION@/$(DISTVERSION)/' > META
 
-LIBINSTALL_FILES = META htmlgen.cma htmlgen.cmxa
+LIBINSTALL_FILES = META htmlgen.cma htmlgen.cmxa htmlgen.a htmlgen.cmi
 
 install: libinstall
 uninstall: libuninstall
