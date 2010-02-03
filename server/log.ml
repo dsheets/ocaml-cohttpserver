@@ -28,8 +28,8 @@ let datetime () =
       tm.Unix.tm_mday tm.Unix.tm_hour tm.Unix.tm_min tm.Unix.tm_sec
 
 let log_request = function
-  |`Debug l -> printf "[%s] %s\n" (datetime ()) l;
-  |`Module (m,l) -> printf "[%s] %.10s: %s\n" (datetime ()) m l
+  |`Debug l -> printf "[%s] %s\n%!" (datetime ()) l;
+  |`Module (m,l) -> printf "[%s] %.10s: %s\n%!" (datetime ()) m l
 
 let logmod m fmt =
   let xfn f = log_request (`Module (m, f)) in
