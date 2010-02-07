@@ -12,6 +12,9 @@ functions for serving web sites
 of static files into a standalone ML file which can serve them up
 directly from memory. Useful for grabbing templates.
 
+* fs2b/ uses the ORM library to convert a directory tree into a
+database with (name * body), to save memory for large binaries.
+
 --
 This library is originally based on the "do it yourself OCaml HTTP"
 daemon by Stefano Zacchiroli <zack@cs.unibo.it>, and since adapted
