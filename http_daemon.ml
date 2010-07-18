@@ -31,10 +31,14 @@ open Http_parser
 
 open Lwt
 
+type conn_id = int
+let string_of_conn_id = string_of_int
+
 type daemon_spec = {
   address: string;
   auth: auth_info;
-  callback: Http_request.request -> Lwt_io.output_channel -> unit Lwt.t;
+  callback: conn_id -> Http_request.request -> Lwt_io.output_channel -> unit Lwt.t;
+  conn_closed : conn_id -> unit;
   port: int;
   root_dir: string option;
   exn_handler: exn -> Lwt_io.output_channel -> unit Lwt.t;
@@ -188,12 +192,12 @@ let rec wrap_parse_request_w_safety parse_function (inchan:Lwt_io.input_channel)
 
   (** - handle HTTP authentication
    *  - handle automatic closures of client connections *)
-let invoke_callback (req:Http_request.request) spec (outchan:Lwt_io.output_channel) =
+let invoke_callback conn_id (req:Http_request.request) spec (outchan:Lwt_io.output_channel) =
   try_lwt 
     (match (spec.auth, (Http_request.authorization req)) with
-       | `None, _ -> spec.callback req outchan  (* no auth required *)
+       | `None, _ -> spec.callback conn_id req outchan  (* no auth required *)
        | `Basic (realm, authfn), Some (`Basic (username, password)) ->
-	   if authfn username password then spec.callback req outchan (* auth ok *)
+	   if authfn username password then spec.callback conn_id req outchan (* auth ok *)
 	   else fail (Unauthorized realm)
        | `Basic (realm, _), _ -> fail (Unauthorized realm)) (* auth failure *)
  with
@@ -201,10 +205,12 @@ let invoke_callback (req:Http_request.request) spec (outchan:Lwt_io.output_chann
    | Again -> return ()
        
 let main spec =
+  let conn_id = ref 0 in
   let () = match spec.root_dir with Some dir -> Sys.chdir dir | None -> () in
   lwt sockaddr = Http_misc.build_sockaddr (spec.address, spec.port) in
   
   let daemon_callback ~clisockaddr ~srvsockaddr inchan outchan =
+    let conn_id = incr conn_id; !conn_id in
     let rec loop () =
       catch (fun () -> 
         debug_print "request";
@@ -212,11 +218,11 @@ let main spec =
           (Http_request.init_request ~clisockaddr ~srvsockaddr) 
           inchan outchan in
         debug_print "invoke_callback";
-        invoke_callback req spec outchan >>=
+        invoke_callback conn_id req spec outchan >>=
         loop
       ) ( function 
-         | End_of_file -> debug_print "done with connection"; return ()
-         | Canceled -> debug_print "cancelled"; return ()
+         | End_of_file -> debug_print "done with connection"; spec.conn_closed conn_id; return ()
+         | Canceled -> debug_print "cancelled"; spec.conn_closed conn_id; return ()
          | e -> fail e )
     in
     debug_print "server starting";
@@ -233,7 +239,7 @@ module Trivial =
   struct
     let heading_slash_RE = Pcre.regexp "^/"
 
-    let trivial_callback req (outchan:Lwt_io.output_channel) =
+    let trivial_callback _ req (outchan:Lwt_io.output_channel) =
       debug_print "trivial_callback";
       let path = Http_request.path req in
       if not (Pcre.pmatch ~rex:heading_slash_RE path) then
@@ -246,16 +252,19 @@ module Trivial =
     let main spec = main { spec with callback = trivial_callback }
   end
 
-let default_callback _ _ = return ()
+let default_callback _ _ _ = return ()
 let default_exn_handler exn _ =
   debug_print "no handler given: re-raising";
   fail exn
+
+let default_conn_closed conn_id = ()
 
 let default_spec = {
   address = "0.0.0.0";
   auth = `None;
   auto_close = false;
   callback = default_callback;
+  conn_closed = default_conn_closed;
   port = 80;
   root_dir = None;
   exn_handler = default_exn_handler;

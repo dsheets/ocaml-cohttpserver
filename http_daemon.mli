@@ -1,9 +1,13 @@
 open Cohttp
 
+type conn_id
+val string_of_conn_id : conn_id -> string
+
 type daemon_spec = {
   address : string;
   auth : Http_types.auth_info;
-  callback : Http_request.request -> Lwt_io.output_channel -> unit Lwt.t;
+  callback : conn_id -> Http_request.request -> Lwt_io.output_channel -> unit Lwt.t;
+  conn_closed : conn_id -> unit;
   port : int;
   root_dir : string option;
   exn_handler : exn -> Lwt_io.output_channel -> unit Lwt.t;
@@ -50,9 +54,9 @@ module Trivial :
   sig
     val heading_slash_RE : Pcre.regexp
     val trivial_callback :
-      Cohttp.Http_request.request -> Lwt_io.output_channel -> unit Lwt.t
+      conn_id -> Cohttp.Http_request.request -> Lwt_io.output_channel -> unit Lwt.t
     val callback :
-      Cohttp.Http_request.request -> Lwt_io.output_channel -> unit Lwt.t
+      conn_id -> Cohttp.Http_request.request -> Lwt_io.output_channel -> unit Lwt.t
     val main : daemon_spec -> 'a Lwt.t
   end
 val default_spec : daemon_spec
