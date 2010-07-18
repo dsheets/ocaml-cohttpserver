@@ -37,11 +37,11 @@ let string_of_conn_id = string_of_int
 type daemon_spec = {
   address: string;
   auth: auth_info;
-  callback: conn_id -> Http_request.request -> Lwt_io.output_channel -> unit Lwt.t;
+  callback: conn_id -> Http_request.request -> Lwt_io.output_channel Lwt.t -> unit Lwt.t;
   conn_closed : conn_id -> unit;
   port: int;
   root_dir: string option;
-  exn_handler: exn -> Lwt_io.output_channel -> unit Lwt.t;
+  exn_handler: exn -> Lwt_io.output_channel Lwt.t -> unit Lwt.t;
   timeout: int option;
   auto_close: bool;
 }
@@ -63,6 +63,7 @@ let control_body code body =
     code reason_phrase code reason_phrase body
 
 let respond_with response outchan =
+  lwt outchan = outchan in
   Http_response.serialize response outchan
 
   (* Warning: keep default values in sync with Http_response.response class *)
@@ -122,7 +123,8 @@ let respond_file ~fname ?droot ?(version = default_version)
           Lwt_io.with_file ~mode:Lwt_io.input path
             (fun inchan ->
 	       lwt file_size = Lwt_io.file_length path in
-	       let resp = Http_response.init ~body:[`Inchan (file_size, inchan)]
+               let (_, finished) = Lwt.wait () in (* don't care when file is finished *)
+	       let resp = Http_response.init ~body:[`Inchan (file_size, inchan, finished)]
 		 ~status:(`Code 200) ~version ()
 	       in respond_with resp outchan
             )
@@ -192,7 +194,7 @@ let rec wrap_parse_request_w_safety parse_function (inchan:Lwt_io.input_channel)
 
   (** - handle HTTP authentication
    *  - handle automatic closures of client connections *)
-let invoke_callback conn_id (req:Http_request.request) spec (outchan:Lwt_io.output_channel) =
+let invoke_callback conn_id (req:Http_request.request) spec (outchan:Lwt_io.output_channel Lwt.t) =
   try_lwt 
     (match (spec.auth, (Http_request.authorization req)) with
        | `None, _ -> spec.callback conn_id req outchan  (* no auth required *)
@@ -211,15 +213,19 @@ let main spec =
   
   let daemon_callback ~clisockaddr ~srvsockaddr inchan outchan =
     let conn_id = incr conn_id; !conn_id in
-    let rec loop () =
+    let rec loop prev =
       catch (fun () -> 
         debug_print "request";
+        let (finished_t, finished_u) = Lwt.wait () in
+        let outchan = prev >> Lwt.return outchan in (* wait for response to finish before writing another *)
         lwt req = wrap_parse_request_w_safety 
-          (Http_request.init_request ~clisockaddr ~srvsockaddr) 
+          (Http_request.init_request ~clisockaddr ~srvsockaddr finished_u) 
           inchan outchan in
+        (* XXX Again exceptions should wakeup finished_u and loop with wakeup'd thread *)
         debug_print "invoke_callback";
-        invoke_callback conn_id req spec outchan >>=
-        loop
+        let prev = invoke_callback conn_id req spec outchan in
+        lwt () = finished_t in (* wait for request to finish before reading another *)
+        loop prev
       ) ( function 
          | End_of_file -> debug_print "done with connection"; spec.conn_closed conn_id; return ()
          | Canceled -> debug_print "cancelled"; spec.conn_closed conn_id; return ()
@@ -227,11 +233,11 @@ let main spec =
     in
     debug_print "server starting";
     try_lwt
-      loop ()
+      loop (Lwt.return ())
     with
       | exn ->
 	  debug_print (sprintf "uncaught exception: %s" (Printexc.to_string exn));
-	  spec.exn_handler exn outchan
+	  spec.exn_handler exn (Lwt.return outchan) (* XXX be sure callbacks are finished *)
   in
     Http_tcp_server.simple ~sockaddr ~timeout:spec.timeout daemon_callback
 
@@ -239,7 +245,7 @@ module Trivial =
   struct
     let heading_slash_RE = Pcre.regexp "^/"
 
-    let trivial_callback _ req (outchan:Lwt_io.output_channel) =
+    let trivial_callback _ req (outchan:Lwt_io.output_channel Lwt.t) =
       debug_print "trivial_callback";
       let path = Http_request.path req in
       if not (Pcre.pmatch ~rex:heading_slash_RE path) then
