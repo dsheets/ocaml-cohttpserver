@@ -74,7 +74,7 @@ let respond ?(body = "") ?(headers = []) ?version ?(status = `Code 200) outchan 
 let respond_control
     func_name ?(is_valid_status = fun _ -> true) ?(headers=[]) ?(body="")
     ?version status outchan =
-  let code = match status with `Code c -> c | `Status s -> code_of_status s in
+  let code = match status with `Code c -> c | #status as s -> code_of_status s in
   if is_valid_status code then
     let headers =
       [ "Content-Type", "text/html; charset=iso-8859-1" ] @ headers
