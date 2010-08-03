@@ -49,6 +49,9 @@ val respond_file :
   ?version:Cohttp.Http_types.version -> ?mime_type: string ->  Lwt_io.output_channel Lwt.t -> unit Lwt.t
 val respond_with :
   Cohttp.Http_response.response -> Lwt_io.output_channel Lwt.t -> unit Lwt.t
+val daemon_callback :
+  daemon_spec ->
+  clisockaddr:Unix.sockaddr -> srvsockaddr:Unix.sockaddr -> Lwt_io.input_channel -> Lwt_io.output_channel -> unit Lwt.t
 val main : daemon_spec -> 'a Lwt.t
 module Trivial :
   sig

@@ -205,12 +205,9 @@ let invoke_callback conn_id (req:Http_request.request) spec (outchan:Lwt_io.outp
  with
    | Unauthorized realm -> respond_unauthorized ~realm outchan
    | Again -> return ()
-       
-let main spec =
+
+let daemon_callback spec =
   let conn_id = ref 0 in
-  let () = match spec.root_dir with Some dir -> Sys.chdir dir | None -> () in
-  lwt sockaddr = Http_misc.build_sockaddr (spec.address, spec.port) in
-  
   let daemon_callback ~clisockaddr ~srvsockaddr inchan outchan =
     let conn_id = incr conn_id; !conn_id in
     let rec loop prev =
@@ -239,7 +236,12 @@ let main spec =
 	  debug_print (sprintf "uncaught exception: %s" (Printexc.to_string exn));
 	  spec.exn_handler exn (Lwt.return outchan) (* XXX be sure callbacks are finished *)
   in
-    Http_tcp_server.simple ~sockaddr ~timeout:spec.timeout daemon_callback
+  daemon_callback
+       
+let main spec =
+  let () = match spec.root_dir with Some dir -> Sys.chdir dir | None -> () in
+  lwt sockaddr = Http_misc.build_sockaddr (spec.address, spec.port) in
+  Http_tcp_server.simple ~sockaddr ~timeout:spec.timeout (daemon_callback spec)
 
 module Trivial =
   struct
