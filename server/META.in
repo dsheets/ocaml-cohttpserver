@@ -1,5 +1,5 @@
 description = "Lightweight HTTP daemon"
 version = "@DISTVERSION@"
-requires = "lwt,cohttp"
+requires = "lwt,cohttp,lwt.unix"
 archive(byte) = "cohttpserver.cma"
 archive(native) = "cohttpserver.cmxa"

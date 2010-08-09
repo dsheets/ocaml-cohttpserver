@@ -88,7 +88,7 @@ let respond_error ?body ?version ?(status = `Code 400) outchan =
   respond_control "Daemon.respond_error" ~is_valid_status:is_error
     ?body ?version status outchan
     
-let respond_not_found ~url ?version outchan =
+let respond_not_found ?version outchan =
   respond_control "Daemon.respond_not_found" ?version (`Code 404) outchan
     
 let respond_forbidden ~url ?version outchan =
@@ -109,7 +109,7 @@ let respond_file ~fname ?droot ?(version = default_version)
     |None -> Sys.getcwd () |Some d -> d in  (* document root *)
   let path = droot ^ "/" ^ fname in (* full path to the desired file *)
     if not (Sys.file_exists path) then (* file not found *)
-      respond_not_found ~url:fname outchan
+      respond_not_found outchan
     else begin
       try
 	if Http_misc.is_directory path then (* file found, is a dir *)
