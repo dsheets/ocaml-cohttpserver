@@ -52,7 +52,7 @@ let process_accept ~sockaddr ~timeout callback (client,_) =
   let events = match timeout with
     |None -> [c]
     |Some t -> [c; (Lwt_unix.sleep (float_of_int t) >> return ()) ] in
-  Lwt.pick events >> try_close outchan >> try_close inchan
+  Lwt.select events >> try_close outchan >> try_close inchan
   
 let simple ~sockaddr ~timeout callback =
   let suck = init_socket sockaddr in
