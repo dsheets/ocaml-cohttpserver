@@ -209,9 +209,12 @@ let daemon_callback spec =
 
     let streams, push_streams = Lwt_stream.create () in
     let write_streams =
-      Lwt_stream.iter_s
-        (fun stream -> stream >>= Lwt_stream.iter_s (Lwt_io.write outchan))
-        streams in
+      catch
+        (fun () ->
+           Lwt_stream.iter_s
+             (fun stream -> stream >>= Lwt_stream.iter_s (Lwt_io.write outchan))
+             streams)
+        (fun _ -> Lwt.return ()) in
 
     let rec loop () =
       catch (fun () -> 
