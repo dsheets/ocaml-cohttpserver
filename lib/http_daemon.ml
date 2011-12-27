@@ -22,10 +22,10 @@
 open Printf
 
 open Cohttp
-open Http_common
-open Http_types
-open Http_constants
-open Http_parser
+open Common
+open Types
+open Constants
+open Parser
 
 open Lwt
 
@@ -35,7 +35,7 @@ let string_of_conn_id = string_of_int
 type daemon_spec = {
   address: string;
   auth: auth_info;
-  callback: conn_id -> Http_request.request -> string Lwt_stream.t Lwt.t;
+  callback: conn_id -> Request.request -> string Lwt_stream.t Lwt.t;
   conn_closed : conn_id -> unit;
   port: int;
   root_dir: string option;
@@ -50,7 +50,7 @@ exception Http_daemon_failure of string
   representing an HTML document that explains the meaning of given status code.
   Additional data can be added to the body via 'body' argument *)
 let control_body code body =
-  let reason_phrase = Http_misc.reason_phrase_of_code code in
+  let reason_phrase = Misc.reason_phrase_of_code code in
   sprintf
 "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
 <HTML><HEAD>
@@ -61,11 +61,11 @@ let control_body code body =
     code reason_phrase code reason_phrase body
 
 let respond_with response =
-  Lwt.return (Http_response.serialize_to_stream response)
+  return (Response.serialize_to_stream response)
 
   (* Warning: keep default values in sync with Http_response.response class *)
 let respond ?(body = "") ?(headers = []) ?version ?(status = `Code 200) () =
-  let resp = Http_response.init ~body:[`String body] ~headers ?version ~status () in
+  let resp = Response.init ~body:[`String body] ~headers ?version ~status () in
   respond_with resp
 
 let respond_control
@@ -114,14 +114,14 @@ let respond_file ~fname ?droot ?(version = default_version)
       respond_not_found ~url:fname ()
     else begin
       try
-	if Http_misc.is_directory path then (* file found, is a dir *)
+	if Sys.is_directory path then (* file found, is a dir *)
           respond_forbidden ~url:fname ~version ()
 	else (* file found, is something else *)
           Lwt_io.with_file ~mode:Lwt_io.input path
             (fun inchan ->
 	       lwt file_size = Lwt_io.file_length path in
                let (_, finished) = Lwt.wait () in (* don't care when file is finished *)
-	       let resp = Http_response.init ~body:[`Inchan (file_size, inchan, finished)]
+	       let resp = Response.init ~body:[`Inchan (file_size, inchan, finished)]
 		 ~status:(`Code 200) ~version ()
 	       in respond_with resp
             )
@@ -176,7 +176,7 @@ let handle_parse_exn e =
 
   match r with
     | Some (status, body) ->
-        debug_print (sprintf "HTTP request parse error: %s" (Printexc.to_string e));
+        prerr_endline (sprintf "HTTP request parse error: %s" (Printexc.to_string e));
         respond_error ~status ~body ()
     | None ->
         fail e
@@ -187,9 +187,9 @@ let handle_parse_exn e =
 
   (** - handle HTTP authentication
    *  - handle automatic closures of client connections *)
-let invoke_callback conn_id (req:Http_request.request) spec =
+let invoke_callback conn_id (req:Request.request) spec =
   try_lwt 
-    (match (spec.auth, (Http_request.authorization req)) with
+    (match (spec.auth, (Request.authorization req)) with
        | `None, _ -> spec.callback conn_id req (* no auth required *)
        | `Basic (realm, authfn), Some (`Basic (username, password)) ->
 	   if authfn username password then spec.callback conn_id req (* auth ok *)
@@ -216,14 +216,12 @@ let daemon_callback spec =
 
     let rec loop () =
       catch (fun () -> 
-        debug_print "request";
         let (finished_t, finished_u) = Lwt.wait () in
 
         let stream =
           try_bind
-            (fun () -> Http_request.init_request ~clisockaddr ~srvsockaddr finished_u inchan)
+            (fun () -> Request.init_request ~clisockaddr ~srvsockaddr finished_u inchan)
             (fun req ->
-               debug_print "invoke_callback";
                invoke_callback conn_id req spec)
             (fun e ->
                try_bind
@@ -238,37 +236,40 @@ let daemon_callback spec =
 
         finished_t >>= loop (* wait for request to finish before reading another *)
       ) ( function 
-         | End_of_file -> debug_print "done with connection"; spec.conn_closed conn_id; return ()
-         | Canceled -> debug_print "cancelled"; spec.conn_closed conn_id; return ()
+         | End_of_file -> prerr_endline "done with connection"; spec.conn_closed conn_id; return ()
+         | Canceled -> prerr_endline "cancelled"; spec.conn_closed conn_id; return ()
          | e -> fail e )
     in
-    debug_print "server starting";
     try_lwt
       loop () <&> write_streams
     with
       | exn ->
-	  debug_print (sprintf "uncaught exception: %s" (Printexc.to_string exn));
+	  prerr_endline (sprintf "uncaught exception: %s" (Printexc.to_string exn));
           (* XXX perhaps there should be a higher-level exn handler for 500s *)
 	  spec.exn_handler exn
   in
   daemon_callback
-       
+      
+let build_sockaddr (addr, port) =
+  try_lwt
+      (* should this be lwt hent = Lwt_lib.gethostbyname addr ? *)
+      let hent = Unix.gethostbyname addr in
+      return (Unix.ADDR_INET (hent.Unix.h_addr_list.(0), port))
+  with _ -> failwith ("ocaml-cohttp, cant resolve hostname: " ^ addr)
+ 
 let main spec =
   let () = match spec.root_dir with Some dir -> Sys.chdir dir | None -> () in
-  lwt sockaddr = Http_misc.build_sockaddr (spec.address, spec.port) in
+  lwt sockaddr = build_sockaddr (spec.address, spec.port) in
   Http_tcp_server.simple ~sockaddr ~timeout:spec.timeout (daemon_callback spec)
 
 module Trivial =
   struct
-    let heading_slash_RE = Pcre.regexp "^/"
-
     let trivial_callback _ req =
-      debug_print "trivial_callback";
-      let path = Http_request.path req in
-      if not (Pcre.pmatch ~rex:heading_slash_RE path) then
-        respond_error ~status:(`Code 400) ()
+      let path = Request.path req in
+      if String.length path > 0 && path.[0] = '/' then
+        respond_file ~fname:(Misc.strip_heading_slash path) ()
       else
-        respond_file ~fname:(Http_misc.strip_heading_slash path) ()
+        respond_error ~status:(`Code 400) ()
 
     let callback = trivial_callback
 
@@ -277,7 +278,6 @@ module Trivial =
 
 let default_callback _ _ = let (s, _) = Lwt_stream.create () in Lwt.return s
 let default_exn_handler exn =
-  debug_print "no handler given: re-raising";
   fail exn
 
 let default_conn_closed conn_id = ()

@@ -20,8 +20,8 @@
 *)
 
 open Cohttp
-open Http_common
-open Http_types
+open Common
+open Types
 open Lwt
 
 let backlog = 15
@@ -38,7 +38,6 @@ let init_socket sockaddr =
   suck
 
 let process_accept ~sockaddr ~timeout callback (client,_) =
-  debug_print "accepted connection";
   (* client is now connected *)
   let inchan = Lwt_io.of_fd Lwt_io.input client in
   let outchan = Lwt_io.of_fd Lwt_io.output client in
