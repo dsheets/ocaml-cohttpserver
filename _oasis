@@ -1,0 +1,15 @@
+OASISFormat: 0.2
+Name:        cohttpd
+Version:     0.9-dev
+Synopsis:    HTTP client and server for Lwt
+Authors:     Anil Madhavapeddy, Stefano Zacchiroli
+License:     LGPL-2.0 with OCaml linking exception
+Plugins:     META (0.2)
+
+Library cohttpd
+  Path:       lib
+  Findlibname: cohttpd
+  Pack: true
+  Modules: Server, Http_tcp_server, Log, Magic_mime, Mime_types
+  BuildTools: ocamlbuild
+  BuildDepends:	lwt.syntax, lwt, lwt.unix, cohttp
