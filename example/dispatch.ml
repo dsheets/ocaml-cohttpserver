@@ -1,6 +1,5 @@
-(*pp camlp4o -I `ocamlfind query lwt.syntax` lwt-syntax-options.cma lwt-syntax.cma *)
 (*
- * Copyright (c) 2009 Anil Madhavapeddy <anil@recoil.org>
+ * Copyright (c) 2009-2011 Anil Madhavapeddy <anil@recoil.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,7 +16,7 @@
 
 open Printf
 open Cohttp
-open Cohttpserver
+open Cohttpd
 open Lwt
 
 module Resp = struct
@@ -27,7 +26,7 @@ module Resp = struct
     let headers = [ "Cache-control", "no-cache" ] in
     let resp = sprintf "<html><body><h1>Error</h1><p>%s</p></body></html>" err in
     let body = [`String resp] in
-    Http_response.init ~body ~headers ~status ()
+    Response.init ~body ~headers ~status ()
 
   (* internal error *)
   let internal_error err = 
@@ -35,13 +34,13 @@ module Resp = struct
     let headers = [ "Cache-control", "no-cache" ] in
     let resp = sprintf "<html><body><h1>Internal Server Error</h1><p>%s</p></body></html>" err in
     let body = [`String resp] in
-    Http_response.init ~body ~headers ~status ()
+    Response.init ~body ~headers ~status ()
 
   (* dynamic response *)
   let dyn req body =
     let status = `OK in
     let headers = [] in
-    Http_response.init ~body ~headers ~status ()
+    Response.init ~body ~headers ~status ()
 
   (* index page *)
   let index req =
@@ -60,14 +59,14 @@ end
 
 (* main callback function *)
 let t con_id req =
-  let path = Http_request.path req in
+  let path = Request.path req in
 
-  printf "%s %s [%s]\n%!" (Http_common.string_of_method (Http_request.meth req)) path 
+  printf "%s %s [%s]\n%!" (Common.string_of_method (Request.meth req)) path 
     (String.concat "," (List.map (fun (h,v) -> sprintf "%s=%s" h v) 
-      (Http_request.params_get req)));
+      (Request.params_get req)));
 
   (* normalize path to strip out ../. and such *)
-  let path_elem = Neturl.norm_path (Pcre.split ~pat:"/" path) in
+  let path_elem = Regexp.Re.(split_delim (from_string "/") path) in
 
   lwt resp = Resp.dispatch req path_elem in
-  Http_daemon.respond_with resp
+  Server.respond_with resp

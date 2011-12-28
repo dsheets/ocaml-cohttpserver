@@ -5,11 +5,24 @@ Synopsis:    HTTP client and server for Lwt
 Authors:     Anil Madhavapeddy, Stefano Zacchiroli
 License:     LGPL-2.0 with OCaml linking exception
 Plugins:     META (0.2)
+BuildTools: ocamlbuild
 
 Library cohttpd
   Path:       lib
   Findlibname: cohttpd
   Pack: true
   Modules: Server, Http_tcp_server, Log, Magic_mime, Mime_types
-  BuildTools: ocamlbuild
   BuildDepends:	lwt.syntax, lwt, lwt.unix, cohttp
+
+Flag examples
+  Description:        Build examples
+  Default:            true
+
+Executable simple_httpd
+  Path:               example
+  MainIs:             simple.ml
+  Build$:             flag(examples)
+  Custom:             true
+  CompiledObject:     best
+  Install:            false
+  BuildDepends:       cohttpd, lwt.syntax
