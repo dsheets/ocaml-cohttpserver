@@ -19,7 +19,7 @@ Flag examples
   Default:            true
 
 Executable simple_httpd
-  Path:               example
+  Path:               lib_test
   MainIs:             simple.ml
   Build$:             flag(examples)
   Custom:             true
