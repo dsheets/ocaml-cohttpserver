@@ -1,5 +1,0 @@
-description = "HTML generation library"
-version = "0.1"
-requires = "str"
-archive(byte) = "htmlgen.cma"
-archive(native) = "htmlgen.cmxa"
