@@ -131,17 +131,10 @@ let respond_file ~fname ?droot ?(version = default_version)
             respond_forbidden ~url:fname ~version ()
     end
       
-(** internal: this exception is raised after a malformed request has been read
-    by a serving process to signal main server (or itself if mode = `Single) to
-    skip to next request *)
-exception Again;;
-
   (* given a Http_parser.parse_request like function, wrap it in a function that
   do the same and additionally catch parsing exception sending HTTP error
-  messages back to client as needed. Returned function raises Again when it
-  encounter a parse error (name 'Again' is intended for future versions that
-  will support http keep alive signaling that a new request has to be parsed
-  from client) *)
+  messages back to client as needed.
+  *)
 
 let handle_parse_exn e =
   let r =
