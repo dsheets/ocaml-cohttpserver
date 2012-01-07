@@ -226,8 +226,13 @@ let daemon_callback spec =
                     Lwt.wakeup_exn finished_u e;
                     Lwt.fail e)) in
         push_streams (Some stream);
-
-        finished_t >>= loop (* wait for request to finish before reading another *)
+        if spec.auto_close then (
+          push_streams None;
+          finished_t
+        )
+        else
+          (* wait for request to finish before reading another *)
+          finished_t >>= loop
       ) ( function 
          | End_of_file -> prerr_endline "done with connection"; spec.conn_closed conn_id; return ()
          | Canceled -> prerr_endline "cancelled"; spec.conn_closed conn_id; return ()
