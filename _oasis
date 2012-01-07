@@ -14,15 +14,21 @@ Library cohttpd
   Modules: Server, Client, Http_tcp_server, Log, Magic_mime, Mime_types
   BuildDepends:	lwt.syntax, lwt, lwt.unix, cohttp, uri
 
-Flag examples
-  Description:        Build examples
+Flag tests
+  Description:        Build tests
   Default:            true
 
 Executable simple_httpd
   Path:               lib_test
   MainIs:             simple.ml
-  Build$:             flag(examples)
+  Build$:             flag(tests)
   Custom:             true
   CompiledObject:     best
   Install:            false
   BuildDepends:       cohttpd, lwt.syntax
+
+Test simple_httpd
+  Run$:               flag(tests)
+  Command:            $simple_httpd
+  WorkingDirectory:   lib_test
+
