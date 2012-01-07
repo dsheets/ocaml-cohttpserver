@@ -157,8 +157,12 @@ let read_response inchan response_body =
     | `String -> (
       lwt resp = 
         match content_length_opt with
-          | Some count -> Lwt_io.read ~count inchan
-          | None -> Lwt_io.read inchan
+          | Some count -> 
+              Lwt_io.read ~count inchan
+          | None ->
+              (* TODO this will block indefinitely if the server does not
+                 do a Connection:close. Need an overall timeout perhaps? *)
+              Lwt_io.read inchan
       in
       match code_of_status status with
         | 200 | 206 -> return (`S (headers, resp))
