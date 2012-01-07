@@ -1,6 +1,7 @@
 # OASIS_START
-# DO NOT EDIT (digest: c6627557c2f5003e339ef1cf3c9e258e)
+# DO NOT EDIT (digest: d1aeb3f46ca6abd6813f3a0ca17be7d3)
 Server
+Client
 Http_tcp_server
 Log
 Magic_mime
