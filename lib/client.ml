@@ -47,8 +47,60 @@ let port_of_uri uri =
   |Some p -> p
 
 let path_of_uri uri = 
-  uri.Uri.path
+  match uri.Uri.path with
+  |"" -> "/"
+  |p -> p
 
+let build_sockaddr (addr, port) =
+  try_lwt
+    (* should this be lwt hent = Lwt_lib.gethostbyname addr ? *)
+    let hent = Unix.gethostbyname addr in
+    return (Unix.ADDR_INET (hent.Unix.h_addr_list.(0), port))
+  with _ -> 
+    raise_lwt (Failure ("cant resolve hostname: " ^ addr))
+
+module Normal = struct
+
+  let connect uri iofn =
+    let open Uri in
+    let address = match uri.host with |Some h -> h |None -> "localhost" in
+    let port = match uri.port with |Some p -> p |None -> 80 in
+    lwt sockaddr = build_sockaddr (address, port) in
+    Lwt_io.with_connection ~buffer_size:tcp_bufsiz sockaddr iofn
+
+end
+
+module SSL = struct
+
+  let sslcontext =
+    Ssl.init ();
+    Ssl.create_context Ssl.SSLv23 Ssl.Client_context
+
+  let connect uri iofn =
+    let open Uri in
+    let address = match uri.host with |Some h -> h |None -> "localhost" in
+    let port = match uri.port with |Some p -> p |None -> 443 in
+    lwt sockaddr = build_sockaddr (address, port) in
+    let fd = Lwt_unix.socket (Unix.domain_of_sockaddr sockaddr) Unix.SOCK_STREAM 0 in
+    lwt () = Lwt_unix.connect fd sockaddr in
+    lwt sock = Lwt_ssl.ssl_connect fd sslcontext in
+    let ic = Lwt_ssl.in_channel_of_descr sock in
+    let oc = Lwt_ssl.out_channel_of_descr sock in
+    try_lwt
+      lwt res = iofn (ic,oc) in
+      Lwt_ssl.close sock >>
+      return res
+    with exn ->
+      Lwt_ssl.close sock >>
+      fail exn
+end
+ 
+let connect uri iofn =
+  match uri.Uri.scheme with
+  |Some "https" -> SSL.connect uri iofn
+  |Some "http" -> Normal.connect uri iofn
+  |Some _ | None -> fail (Failure "unknown scheme")
+ 
 let rec read_write_r inchan outchan read_size num_read max_to_read =
   lwt s = Lwt_io.read ~count:read_size inchan in
   if s = ""  then
@@ -99,23 +151,17 @@ let build_req_header headers meth uri body =
     sprintf "%s\r\n%s: %s" prev name value in
   let hdrst = Hashtbl.fold serialize_header hdrht "" in
   let path = path_of_uri uri in
-  sprintf "%s %s HTTP/1.0%s\r\n\r\n" meth path hdrst
+  sprintf "%s %s HTTP/1.1%s\r\n\r\n" meth path hdrst
 
 let request ?(headers=[]) outchan meth body uri =
   let req_header = build_req_header headers meth uri body in
   lwt () = Lwt_io.write outchan req_header in
-  lwt () =
-    match body with
-      | `None -> 
-           return ()
-      | `String s ->
-           Lwt_io.write outchan s
-      | `InChannel (content_length, inchan) ->
-           read_write inchan outchan 
+  lwt () = match body with
+    | `None -> return ()
+    | `String s -> Lwt_io.write outchan s
+    | `InChannel (content_length, inchan) -> read_write inchan outchan 
   in
   Lwt_io.flush outchan
-
-let id x = x
 
 let parse_content_range s =
   try
@@ -146,11 +192,20 @@ let content_length_of_content_range headers =
   with Not_found ->
     None
 
+(* Determine content length, either by content-length header or
+   via content-range if content-length is not specified *)
+let content_length_of_headers headers =
+  try
+    let length = List.assoc "content-length" headers in
+    Some (int_of_string length)
+  with _ ->
+    content_length_of_content_range headers
+    
 let read_response inchan response_body =
   lwt (_, status) = Parser.parse_response_fst_line inchan in
   lwt headers = Parser.parse_headers inchan in
   let headers = List.map (fun (h, v) -> (String.lowercase h, v)) headers in
-  let content_length_opt = content_length_of_content_range headers in
+  let content_length_opt = content_length_of_headers headers in
   (* a status code of 206 (Partial) will typicall accompany "Content-Range" 
      response header *)
   match response_body with
@@ -179,21 +234,8 @@ let read_response inchan response_body =
         | code -> fail (Http_error (code, headers, ""))
       )
 
-let build_sockaddr (addr, port) =
-  try_lwt
-      (* should this be lwt hent = Lwt_lib.gethostbyname addr ? *)
-      let hent = Unix.gethostbyname addr in
-      return (Unix.ADDR_INET (hent.Unix.h_addr_list.(0), port))
-  with _ -> failwith ("ocaml-cohttp, cant resolve hostname: " ^ addr)
-
-let connect uri iofn =
-  let open Uri in
-  let address = match uri.host with |Some h -> h |None -> "localhost" in
-  let port = match uri.port with |Some p -> p |None -> 80 in
-  lwt sockaddr = build_sockaddr (address, port) in
-  Lwt_io.with_connection ~buffer_size:tcp_bufsiz sockaddr iofn
-  
-let call (headers:headers) kind request_body uri response_body  =
+ 
+let call (headers:headers) kind (request_body:request_body) uri response_body  =
   let meth = match kind with
     | `GET -> "GET"
     | `HEAD -> "HEAD"
@@ -217,7 +259,7 @@ let call (headers:headers) kind request_body uri response_body  =
     | (Tcp_error _ | Http_error _) as e -> fail e
     | exn -> fail (Tcp_error (Connect, exn))
 
-let call_to_string headers kind (request_body:request_body) url : (headers * string) Lwt.t =
+let call_to_string (headers:headers) kind (request_body:request_body) url : (headers * string) Lwt.t =
   lwt resp = call headers kind request_body url `String in
   (* assert relation between request and response kind *)
   match resp with

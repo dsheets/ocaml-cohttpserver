@@ -12,7 +12,7 @@ Library cohttpd
   Findlibname: cohttpd
   Pack: true
   Modules: Server, Client, Http_tcp_server, Log, Magic_mime, Mime_types
-  BuildDepends:	lwt.syntax, lwt, lwt.unix, cohttp, uri
+  BuildDepends:	lwt.syntax, lwt, lwt.unix, lwt.ssl, cohttp, uri
 
 Flag tests
   Description:        Build tests
@@ -25,10 +25,24 @@ Executable simple_httpd
   Custom:             true
   CompiledObject:     best
   Install:            false
-  BuildDepends:       cohttpd, lwt.syntax
+  BuildDepends:       cohttpd, lwt.syntax, lwt.unix, lwt.ssl
+
+Executable simple_client
+  Path:               lib_test
+  MainIs:             simple_client.ml
+  Build$:             flag(tests)
+  Custom:             true
+  CompiledObject:     best
+  Install:            false
+  BuildDepends:       cohttpd, lwt.syntax, lwt.unix, lwt.ssl
 
 Test simple_httpd
   Run$:               flag(tests)
   Command:            $simple_httpd
+  WorkingDirectory:   lib_test
+
+Test simple_client
+  Run$:               flag(tests)
+  Command:            $simple_client
   WorkingDirectory:   lib_test
 
