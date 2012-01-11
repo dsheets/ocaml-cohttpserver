@@ -12,7 +12,7 @@ Library cohttpd
   Findlibname: cohttpd
   Pack: true
   Modules: Server, Client, Http_tcp_server, Log, Magic_mime, Mime_types
-  BuildDepends:	lwt.syntax, lwt, lwt.unix, lwt.ssl, cohttp, uri
+  BuildDepends:	lwt.syntax, lwt, lwt.unix, lwt.ssl, cohttp, uri, re.str
 
 Flag tests
   Description:        Build tests

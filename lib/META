@@ -1,8 +1,8 @@
 # OASIS_START
-# DO NOT EDIT (digest: c3c3e028c9602f190716d58d72b2361a)
+# DO NOT EDIT (digest: e086616d1212b64f276ed58902dea9c7)
 version = "0.9-dev"
 description = "HTTP client and server for Lwt"
-requires = "lwt.syntax lwt lwt.unix lwt.ssl cohttp uri"
+requires = "lwt.syntax lwt lwt.unix lwt.ssl cohttp uri re.str"
 archive(byte) = "cohttpd.cma"
 archive(native) = "cohttpd.cmxa"
 exists_if = "cohttpd.cma"

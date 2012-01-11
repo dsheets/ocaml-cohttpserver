@@ -67,6 +67,6 @@ let t con_id req =
       (Request.params_get req)));
 
   (* normalize path to strip out ../. and such *)
-  let path_elem = Regexp.Re.(split_delim ~filter_empty:true (from_string "/") path) in
+  let path_elem = Re_str.(split (regexp_string "/") path) in
   lwt resp = Resp.dispatch req path_elem in
   Server.respond_with resp
