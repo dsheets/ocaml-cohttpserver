@@ -5,7 +5,6 @@ val string_of_conn_id : conn_id -> string
 
 type daemon_spec = {
   address : string;
-  auth : Types.auth_info;
   callback : conn_id -> Request.request -> string Lwt_stream.t Lwt.t;
   conn_closed : conn_id -> unit;
   port : int;

@@ -34,7 +34,6 @@ let string_of_conn_id = string_of_int
 
 type daemon_spec = {
   address: string;
-  auth: auth_info;
   callback: conn_id -> Request.request -> string Lwt_stream.t Lwt.t;
   conn_closed : conn_id -> unit;
   port: int;
@@ -178,20 +177,11 @@ let handle_parse_exn e =
   callbacks keep on living until the end or are they all killed immediately?
   The right semantics should obviously be the first one *)
 
-  (** - handle HTTP authentication
-   *  - handle automatic closures of client connections *)
 let invoke_callback conn_id (req:Request.request) spec =
   try_lwt 
-    (match (spec.auth, (Request.authorization req)) with
-       | `None, _ -> spec.callback conn_id req (* no auth required *)
-       | `Basic (realm, authfn), Some (`Basic (username, password)) ->
-	   if authfn username password then spec.callback conn_id req (* auth ok *)
-	   else fail (Unauthorized realm)
-       | `Basic (realm, _), _ -> fail (Unauthorized realm)) (* auth failure *)
-  with
-    | Unauthorized realm -> respond_unauthorized ~realm ()
-    | e ->
-        respond_error ~status:`Internal_server_error ~body:(Printexc.to_string e) ()
+    spec.callback conn_id req (* no auth required *)
+  with e ->
+    respond_error ~status:`Internal_server_error ~body:(Printexc.to_string e) ()
 
 let daemon_callback spec =
   let conn_id = ref 0 in
@@ -282,7 +272,6 @@ let default_conn_closed conn_id = ()
 
 let default_spec = {
   address = "0.0.0.0";
-  auth = `None;
   auto_close = false;
   callback = default_callback;
   conn_closed = default_conn_closed;
