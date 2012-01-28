@@ -242,22 +242,20 @@ let call (headers:headers) kind (request_body:request_body) uri response_body  =
     | `PUT -> "PUT" 
     | `DELETE -> "DELETE" 
     | `POST -> "POST" in
-  try_lwt connect uri
+  connect uri
     (fun (i, o) ->
       (try_lwt
          request ~headers o meth request_body uri
-       with exn -> 
-         fail (Tcp_error (Write, exn))
+       with
+        | Lwt.Canceled as e -> fail e
+        | exn -> fail (Tcp_error (Write, exn))
       ) >> (
         try_lwt 
           read_response i response_body
         with
-          | (Http_error _) as e -> fail e
+          | (Http_error _) | Lwt.Canceled as e -> fail e
           | exn -> fail (Tcp_error (Read, exn))
        ))
-  with
-    | (Tcp_error _ | Http_error _) as e -> fail e
-    | exn -> fail (Tcp_error (Connect, exn))
 
 let call_to_string (headers:headers) kind (request_body:request_body) url : (headers * string) Lwt.t =
   lwt resp = call headers kind request_body url `String in
