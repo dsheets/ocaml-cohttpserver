@@ -69,4 +69,5 @@ let t con_id req =
   (* normalize path to strip out ../. and such *)
   let path_elem = Re_str.(split (regexp_string "/") path) in
   lwt resp = Resp.dispatch req path_elem in
+  Lwt_unix.sleep 1.0 >>
   Server.respond_with resp

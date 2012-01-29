@@ -33,10 +33,25 @@ let rec request_t () =
   lwt () = Lwt_unix.sleep 1.0 in
   incr req_num;
   let uri = Uri.of_string "http://localhost:8080/" in
-  lwt hdrs, body = Cohttpd.Client.get uri in
-  printf "#%d:\n%!" !req_num;
-  List.iter (fun (k,v) -> printf "  %.20s: %s\n" k v) hdrs;
-  printf "%s\n\n%!" body;
+  let req_t = Cohttpd.Client.get uri in
+  let a_t =
+    lwt hdrs, body = req_t in
+    printf "#%d:\n%!" !req_num;
+    List.iter (fun (k,v) -> printf "  %.20s: %s\n" k v) hdrs;
+    printf "%s\n\n%!" body;
+    return ()
+  in
+  let b_t = 
+    lwt () = Lwt_unix.sleep (Random.float 3.0) in
+    Lwt.cancel req_t;
+    return ()
+  in
+  lwt () =
+    try_lwt
+      a_t <&> b_t 
+    with Lwt.Canceled ->
+      return ()
+  in
   request_t ()
 
 let _ =

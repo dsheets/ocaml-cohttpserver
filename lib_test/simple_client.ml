@@ -24,8 +24,8 @@ let uris = [
 let client_t = 
   Lwt_list.iter_s (fun uri_str ->
     let uri = Uri.of_string uri_str in
-    printf "GET %s\n" uri_str;
-    printf "GET %s\n" (Uri.to_string uri);
+    printf "GET %s\n%!" uri_str;
+    printf "GET %s\n%!" (Uri.to_string uri);
     lwt hdrs, body = Cohttpd.Client.get uri in 
     List.iter (fun (k,v) -> printf "  %s: %s\n" k v) hdrs;
     printf "%s\n\n%!" body;
