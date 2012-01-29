@@ -200,40 +200,44 @@ let content_length_of_headers headers =
     Some (int_of_string length)
   with _ ->
     content_length_of_content_range headers
+
+(* determine transfer encoding *)
+let stream_of_body headers ic =
+  let transfer_encoding =
+    try Some (String.lowercase (List.assoc "transfer-encoding" headers))
+    with Not_found -> None
+  in
+  let content_length = content_length_of_headers headers in
+  match content_length, transfer_encoding with
+  |_, Some "chunked" -> Transfer.(read Chunked ic)
+  |Some len, Some _
+  |Some len, None -> Transfer.(read (Fixed len) ic) 
+  |None, None
+  |None, Some _ -> Transfer.(read Unknown ic)
     
 let read_response inchan response_body =
   lwt (_, status) = Parser.parse_response_fst_line inchan in
   lwt headers = Parser.parse_headers inchan in
   let headers = List.map (fun (h, v) -> (String.lowercase h, v)) headers in
   let content_length_opt = content_length_of_headers headers in
+  let response_stream = stream_of_body headers inchan in
   (* a status code of 206 (Partial) will typicall accompany "Content-Range" 
      response header *)
   match response_body with
-    | `String -> (
-      lwt resp = 
-        match content_length_opt with
-          | Some count -> 
-              Lwt_io.read ~count inchan
-          | None ->
-              (* TODO this will block indefinitely if the server does not
-                 do a Connection:close. Need an overall timeout perhaps? *)
-              Lwt_io.read inchan
-      in
+    | `String -> begin
+      let buf = Buffer.create (match content_length_opt with |None -> 1024 |Some l -> l) in
+      lwt () = Lwt_stream.iter (Buffer.add_string buf) response_stream in
+      let resp = Buffer.contents buf in
       match code_of_status status with
-        | 200 | 206 -> return (`S (headers, resp))
-        | code -> fail (Http_error (code, headers, resp))
-      )
-    | `OutChannel outchan -> (
-      lwt () = 
-        match content_length_opt with
-          | Some count -> read_write_count ~count inchan outchan 
-          | None -> read_write inchan outchan
-      in
+      | 200 | 206 -> return (`S (headers, resp))
+      | code -> fail (Http_error (code, headers, resp))
+    end
+    | `OutChannel outchan -> begin
+      lwt () = Lwt_stream.iter_s (Lwt_io.write outchan) response_stream in
       match code_of_status status with
         | 200 | 206 -> return (`C headers)
         | code -> fail (Http_error (code, headers, ""))
-      )
-
+    end
  
 let call (headers:headers) kind (request_body:request_body) uri response_body  =
   let meth = match kind with
