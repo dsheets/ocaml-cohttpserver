@@ -1,5 +1,5 @@
 .PHONY: all clean install build
-all: build test doc
+all: build doc
 
 NAME=cohttpd
 
@@ -13,7 +13,7 @@ setup.data: setup.bin
 	./setup.bin -configure
 
 build: setup.data setup.bin
-	./setup.bin -build
+	./setup.bin -build -classic-display
 
 doc: setup.data setup.bin
 	./setup.bin -doc
