@@ -46,10 +46,13 @@ let port_of_uri uri =
   end
   |Some p -> p
 
+(* Path+Query string *)
 let path_of_uri uri = 
-  match uri.Uri.path with
-  |"" -> "/"
-  |p -> p
+  match uri.Uri.path, uri.Uri.query with
+  |"", None -> "/"
+  |"", (Some q) -> sprintf "/?%s" q
+  |p, None -> p
+  |p, Some q -> sprintf "%s?%s" p q
 
 let build_sockaddr (addr, port) =
   try_lwt
