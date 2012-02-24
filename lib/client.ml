@@ -33,14 +33,14 @@ exception Http_error of (int * headers * string)  (* code, body *)
 let tcp_bufsiz = 4096 (* for TCP I/O *)
 
 let host_of_uri uri = 
-  match uri.Uri.host with
+  match Uri.host uri with
   |None -> "localhost"
   |Some h -> h
 
 let port_of_uri uri =
-  match uri.Uri.port with
+  match Uri.port uri with
   |None -> begin
-     match uri.Uri.scheme with 
+     match Uri.scheme uri with 
      |Some "https" -> 443 (* TODO: actually support https *)
      |Some "http" | Some _ |None -> 80
   end
@@ -48,11 +48,11 @@ let port_of_uri uri =
 
 (* Path+Query string *)
 let path_of_uri uri = 
-  match uri.Uri.path, uri.Uri.query with
-  |"", None -> "/"
-  |"", (Some q) -> sprintf "/?%s" q
-  |p, None -> p
-  |p, Some q -> sprintf "%s?%s" p q
+  match (Uri.path uri), (Uri.query uri) with
+  |"", [] -> "/"
+  |"", q -> sprintf "/?%s" (Uri.encoded_of_query q)
+  |p, [] -> p
+  |p, q -> sprintf "%s?%s" p (Uri.encoded_of_query q)
 
 let build_sockaddr (addr, port) =
   try_lwt
@@ -66,8 +66,8 @@ module Normal = struct
 
   let connect uri iofn =
     let open Uri in
-    let address = match uri.host with |Some h -> h |None -> "localhost" in
-    let port = match uri.port with |Some p -> p |None -> 80 in
+    let address = host_of_uri uri in
+    let port = port_of_uri uri in
     lwt sockaddr = build_sockaddr (address, port) in
     Lwt_io.with_connection ~buffer_size:tcp_bufsiz sockaddr iofn
 
@@ -80,9 +80,8 @@ module SSL = struct
     Ssl.create_context Ssl.SSLv23 Ssl.Client_context
 
   let connect uri iofn =
-    let open Uri in
-    let address = match uri.host with |Some h -> h |None -> "localhost" in
-    let port = match uri.port with |Some p -> p |None -> 443 in
+    let address = host_of_uri uri in
+    let port = port_of_uri uri in
     lwt sockaddr = build_sockaddr (address, port) in
     let fd = Lwt_unix.socket (Unix.domain_of_sockaddr sockaddr) Unix.SOCK_STREAM 0 in
     lwt () = Lwt_unix.connect fd sockaddr in
@@ -99,7 +98,7 @@ module SSL = struct
 end
  
 let connect uri iofn =
-  match uri.Uri.scheme with
+  match Uri.scheme uri with
   |Some "https" -> SSL.connect uri iofn
   |Some "http" -> Normal.connect uri iofn
   |Some _ | None -> fail (Failure "unknown scheme")
