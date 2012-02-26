@@ -231,7 +231,7 @@ let read_response inchan response_body =
       lwt () = Lwt_stream.iter (Buffer.add_string buf) response_stream in
       let resp = Buffer.contents buf in
       match code_of_status status with
-      | 200 | 206 -> return (`S (headers, resp))
+      | 200 | 201 | 202 | 203 | 204 | 205 | 206 -> return (`S (headers, resp))
       | code -> fail (Http_error (code, headers, resp))
     end
     | `OutChannel outchan -> begin
