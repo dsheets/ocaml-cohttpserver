@@ -115,15 +115,14 @@ let respond_file ~fname ?droot ?(version = default_version)
       try
 	if Sys.is_directory path then (* file found, is a dir *)
           respond_forbidden ~url:fname ~version ()
-	else (* file found, is something else *)
-          Lwt_io.with_file ~mode:Lwt_io.input path
-            (fun inchan ->
-	       lwt file_size = Lwt_io.file_length path in
-               let (_, finished) = Lwt.wait () in (* don't care when file is finished *)
-	       let resp = Response.init ~body:[`Inchan (file_size, inchan, finished)]
-		 ~status:(`Code 200) ~version ()
-	       in respond_with resp
-            )
+	else begin (* file found, is something else *)
+          lwt inchan = Lwt_io.open_file ~mode:Lwt_io.input path in
+          lwt file_size = Lwt_io.file_length path in
+          let finished_t, finished_u = Lwt.task () in
+          let resp = Response.init ~body:[`Inchan (file_size, inchan, finished_u)] ~status:(`Code 200) ~version () in
+          let _ = finished_t >> Lwt_io.close inchan in
+	  respond_with resp
+      end
       with
 	| Unix.Unix_error (Unix.EACCES, _, _)
 	| Sys_error _ ->
